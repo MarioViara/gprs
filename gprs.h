@@ -112,6 +112,14 @@ extern "C" {
 
 
 /**
+ * Serial statistics
+ */
+#ifndef GPRS_SERIAL_STAT
+#define GPRS_SERIAL_STAT	0
+#endif
+
+
+/**
  * Buffer size for the reply buffer of the modem
  */ 
 #ifndef GPRS_REPLY_BUFFER_SIZE
@@ -431,9 +439,15 @@ typedef struct
 	u32_t			recvLen;
 
 	/**
-	 * sempahore to process received data
+	 * semaphore to process received data
 	 */
 	sys_sem_t		recvSem;
+#endif
+
+
+#if GPRS_SERIAL_STAT
+	u32_t			rcvdBtes;
+	u32_t			sentBytes;
 #endif
 
 } gprs_t;
@@ -568,6 +582,16 @@ void gprs_arch_modem_on(u8_t device);
 void gprs_arch_modem_off(u8_t device);
 #endif
 
+
+#if GPRS_SERIAL_STAT
+/**
+ * Get serial statistics from gprs.
+ *
+ * @param sent - Number of sent bytes.
+ * @param rcvd - Number of rcvd bytes
+ */
+void gprs_get_stat(gprs_t * gprs,u32_t * sent,u32_t * rcvd);
+#endif
 #endif  /* GPRS_SUPPPORT */
 
 

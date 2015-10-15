@@ -226,6 +226,28 @@ static int modem_check_ok_reply(gprs_t * gprs,const u8_t * data,u32_t length)
 }
 
 /**
+ * Output data to the serial port
+ *
+ * @param data - Data to be sent
+ * @param length - Length of ata
+ */
+static void gprs_serial_output(gprs_t * gprs,u8_t * data,u32_t length)
+{
+	u32_t sent;
+
+	sent = sio_write(gprs->fd,data,length);
+
+    if (sent != length)
+    {
+        LWIP_DEBUGF(MODEM_DEBUG,("gprs: send: failed lenth=%u\n",(unsigned)length));
+    }
+
+#if GPRS_SERIAL_STAT
+    gprs->sentBytes += length;
+#endif
+}
+
+/**
  * Set the state of the gprs machine.
  *
  * @param newState - New state.
@@ -340,6 +362,9 @@ static void gprs_thread(void *arg)
 
         if (gprs->recvLen > 0)
         {
+#if GPRS_SERIAL_STAT
+        	gprs->rcvdBtes += gprs->recvLen;
+#endif
 
             if (tcpip_callback(gprs_input_callback,(void *)gprs) != ERR_OK)
             {
@@ -356,7 +381,7 @@ static void gprs_thread(void *arg)
 }
 #else
 /**
- * Must be called from the user when data are avilable from the serial port.
+ * Must be called from the user when data are available from the serial port.
  *
  */
 void gprs_input(gprs_t * gprs,u8_t * data,u32_t length)
@@ -366,6 +391,21 @@ void gprs_input(gprs_t * gprs,u8_t * data,u32_t length)
 
 #endif
 
+
+/**
+ * PPOS output function
+ */
+static u32_t gprs_pppos_output(ppp_pcb *pcb,u8_t * data,u32_t length,void *ctx)
+{
+	gprs_t * gprs = (gprs_t *)ctx;
+
+	(void)pcb;
+
+	gprs_serial_output(gprs,data,length);
+
+	return length;
+
+}
 /**
  * Create a new gprs connection
  *
@@ -392,9 +432,10 @@ gprs_t * gprs_new(u8_t device)
 
         gprs->csq = GSM_CSQ_INVALID;
 
+
         if (gprs->fd != 0)
         {
-            gprs->pcb = pppos_create(&gprs->pppif,gprs->fd,gprs_callback,(void *)gprs);
+            gprs->pcb = pppos_create(&gprs->pppif,gprs_pppos_output,gprs_callback,(void *)gprs);
             
             if (gprs->pcb)
                 
@@ -432,6 +473,7 @@ gprs_t * gprs_new(u8_t device)
     return gprs;
 }
 
+
 /**
  * Send a string to the modem.
  *
@@ -441,24 +483,19 @@ gprs_t * gprs_new(u8_t device)
 static void gprs_raw_send(gprs_t* gprs,const char * cmd,u8_t eol)
 {
 
-    u32_t length,sent;
+    u32_t length;
 
 
     length = strlen(cmd);
 
     LWIP_DEBUGF(MODEM_DEBUG,("gprs: Sent: '%s' (eol=%d)\n",cmd,eol));
     
-    sent = sio_write(gprs->fd,(u8_t *)cmd,length);
+    gprs_serial_output(gprs,(u8_t *)cmd,length);
 
-
-    if (sent != length)
-    {
-        LWIP_DEBUGF(MODEM_DEBUG,("gprs: send: failed\n"));
-    }
 
     if (eol)
     {
-    	sio_write(gprs->fd,&eol,1);
+        gprs_serial_output(gprs,&eol,1);
     }
 
 }
@@ -1126,4 +1163,12 @@ void gprs_set_roaming(gprs_t * gprs,u8_t roaming)
 	gprs->roaming = roaming;
 }
 
+
+#if GPRS_SERIAL_STAT
+void gprs_get_stat(gprs_t * gprs,u32_t * sent,u32_t * rcvd)
+{
+	*sent = gprs->sentBytes;
+	*rcvd = gprs->rcvdBtes;
+}
+#endif
 #endif  /* GPRS_SUPPPORT */
