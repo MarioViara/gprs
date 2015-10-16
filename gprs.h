@@ -67,6 +67,14 @@ extern "C" {
  */
 #if GPRS_SUPPORT
 
+
+/**
+ * If set to 1 the sim CCID read before starting the connection
+ */
+#ifndef GPRS_ICCID
+#define GPRS_ICCID	0
+#endif
+
 /**
  * GPRS debug options
  */
@@ -290,6 +298,9 @@ typedef enum
 	GPRS_STATE_MODEM_ALIVE,
 	GPRS_STATE_MODEM_IDENTIFY,
 	GPRS_STATE_MODEM_IMEI,
+#if GPRS_ICCID
+	GPRS_STATE_MODEM_CCID,
+#endif
 	GPRS_STATE_GSM_NETWORK,
 	GPRS_STATE_GPRS_NETWORK,
 	GPRS_STATE_MODEM_INIT,
@@ -306,7 +317,7 @@ typedef enum
 typedef struct
 {
 	/**
-	 * Sio device numebr
+	 * Sio device number
 	 */
 	u8_t            device;
 
@@ -411,6 +422,15 @@ typedef struct
 	 */
 	char			imei[15+1];
 	
+#if GPRS_ICCID
+	/**
+	 * Sim CCID
+	 */
+	char			ccid[20+1];
+
+	char			ccidChksum;
+#endif
+
 	/**
 	 * PPP structure
 	 */
@@ -588,12 +608,24 @@ void gprs_arch_modem_off(u8_t device);
  * Get serial statistics from gprs.
  *
  * @param sent - Number of sent bytes.
- * @param rcvd - Number of rcvd bytes
+ * @param rcvd - Number of received  bytes
  */
 void gprs_get_stat(gprs_t * gprs,u32_t * sent,u32_t * rcvd);
 #endif
 #endif  /* GPRS_SUPPPORT */
 
+#if GPRS_ICCID
+/**
+ * Return the SIM ICCID
+ *
+ * The CCID is a unique number that identify a SIM up to 22 digit length filled with hex digit F,
+ *
+ * @param check - Will set to the removed check  digit (ASCII code 0x30-0x39 or 0 if not valid)
+ *
+ * @return The SIM ICCID without filler and check digit if valid.
+ */
+const char * gprs_get_iccid(gprs_t * gprs,char *check);
+#endif
 
 #ifdef  __cplusplus
 }

@@ -14,12 +14,14 @@
  *   non-profit or commercial product UNDER YOUR RESPONSIBILITY.
  * - Redistributions of source code must retain the above copyright notice.
  * 
+ * Supported and tested modem types :
  */
 #include <string.h>
 #include "gprs.h"
 
 #include "lwip/pbuf.h"
 #include "lwip/dns.h"
+
 
 /**
  * Compile only if enabled
@@ -687,6 +689,92 @@ static void do_modem_imei_reply(gprs_t * gprs,const char * reply)
     }
 }
 
+#if GPRS_ICCID
+/**
+ * Send the get sim CCID command.
+ */
+static void do_sim_iccid(gprs_t * gprs)
+{
+	UNTIMEOUT();
+
+	gprs->ccid[0] = 0;
+	gprs_set_state(gprs,GPRS_STATE_MODEM_CCID);
+	gprs_command(gprs,"AT+CCID",'\r');
+}
+
+static char gprs_mod10(const char *buff,size_t  len)
+{
+	size_t i,mod,sum;
+	char digit;
+
+	sum = 0;
+	mod = len & 1;
+
+	for( i = 0 ; i < len ; i ++)
+	{
+		digit = buff[i];
+
+		if (digit >= '0' && digit <= '9')
+		{
+			digit -= '0';
+			if ((i & 1) != mod)
+				digit *= 2;
+			if (digit > 9)
+				digit -= 9;
+			sum += digit;
+		}
+
+	}
+
+	return((char)((( 10 - (sum % 10)) % 10) +'0'));
+}
+
+static void do_sim_iccid_reply(gprs_t * gprs,const char * reply)
+{
+    const char * result;
+    size_t length;
+    char c;
+
+    result = modem_first_token(gprs,reply);
+
+    if (result)
+    {
+
+   		sstrcpy(gprs->ccid,result,sizeof(gprs->ccid));
+
+   		/*
+   		 * Remove the filler digit
+   		 */
+   		for (length = strlen(gprs->ccid) ; length > 0 && (gprs->ccid[length - 1] == 'f' || gprs->ccid[length - 1] == 'F') ;)
+   		{
+   			gprs->ccid[length - 1] = 0;
+   			length = strlen(gprs->ccid);
+   		}
+
+   		gprs->ccidChksum = 0;
+   		if (length > 1)
+   		{
+   			c = gprs_mod10(gprs->ccid,length - 1);
+   			if (c == gprs->ccid[length - 1])
+   			{
+   				gprs->ccid[length - 1] = 0;
+   				gprs->ccidChksum = c;
+   			}
+   		}
+   		LWIP_DEBUGF(GPRS_DEBUG,("gprs: ICCID='%s' length=%u chksum=%c\n",gprs->ccid,strlen(gprs->ccid),gprs->ccidChksum == 0 ? '?' : gprs->ccidChksum));
+    }
+}
+
+const char * gprs_get_iccid(gprs_t * gprs,char *chksum)
+{
+	if (chksum)
+	{
+		*chksum = gprs->ccidChksum;
+	}
+	return gprs->ccid;
+}
+#endif
+
 /**
  * Send the get IMEI command.
  */
@@ -1085,9 +1173,22 @@ static void gprs_input_internal(gprs_t * gprs,u8_t * data,u32_t length)
             case GPRS_STATE_MODEM_IMEI:
                 if (modem_check_reply(gprs,data,length,do_modem_imei_reply) == MODEM_REPLY_OK)
                 {
+#if GPRS_ICCID
+                	do_sim_iccid(gprs);
+#else
+                    do_gsm_network(gprs);
+#endif
+                }
+            	break;
+
+#if GPRS_ICCID
+            case GPRS_STATE_MODEM_CCID:
+                if (modem_check_reply(gprs,data,length,do_sim_iccid_reply) == MODEM_REPLY_OK)
+                {
                     do_gsm_network(gprs);
                 }
             	break;
+#endif
 
             case GPRS_STATE_MODEM_IDENTIFY:
                 if (modem_check_reply(gprs,data,length,do_modem_identify_reply) == MODEM_REPLY_OK)
