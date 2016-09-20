@@ -69,6 +69,13 @@ extern "C" {
 
 
 /**
+ * If set to 1 the modem TYPE is read before starting the connection
+ */
+#ifndef GPRS_TYPE
+#define GPRS_TYPE	0
+#endif
+
+/**
  * If set to 1 the sim CCID read before starting the connection
  */
 #ifndef GPRS_ICCID
@@ -410,10 +417,10 @@ typedef struct
 	 */
 	char	*		replyPtr;
 
+#if GPRS_RUNTIME_APN
 	/**
 	 * Runtime APN
 	 */
-#if GPRS_RUNTIME_APN
     char            apn[GPRS_APN_SIZE];
 #endif
 	
@@ -422,6 +429,13 @@ typedef struct
 	 */
 	char			imei[15+1];
 	
+#if GPRS_TYPE
+	/**
+	 * Modem TYPE
+	 */
+	char			type[32+1];
+#endif
+
 #if GPRS_ICCID
 	/**
 	 * Sim CCID
@@ -613,6 +627,15 @@ void gprs_arch_modem_off(u8_t device);
 void gprs_get_stat(gprs_t * gprs,u32_t * sent,u32_t * rcvd);
 #endif
 #endif  /* GPRS_SUPPPORT */
+
+#if GPRS_TYPE
+/**
+ * Return the GSM modem TYPE
+ *
+ * @return TYPE
+ */
+const char * gprs_get_type(gprs_t * gprs);
+#endif
 
 #if GPRS_ICCID
 /**

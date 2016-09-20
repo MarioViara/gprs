@@ -652,12 +652,15 @@ static void do_modem_identify_reply(gprs_t * gprs,const char * reply)
 {
     LWIP_DEBUGF(GPRS_DEBUG,("gprs: Identify: '%s'\n",reply));
 
+#if GPRS_TYPE
+    sstrcpy(gprs->type,reply,sizeof(gprs->type));
+#endif
+
     if (!strncmp(reply,"SIM800",6))
     {
         gprs->cgreg = 1;
     }
-    
-	}
+}
 
 /**
  * Send the modem identify command.
@@ -665,6 +668,10 @@ static void do_modem_identify_reply(gprs_t * gprs,const char * reply)
 static void do_modem_identify(gprs_t * gprs)
 {
 	UNTIMEOUT();
+
+#if GPRS_TYPE
+	gprs->type[0] = 0;
+#endif
 
     gprs->cgreg = 0;
 	gprs_set_state(gprs,GPRS_STATE_MODEM_IDENTIFY);
@@ -1249,13 +1256,13 @@ const char * gprs_get_apn(gprs_t * gprs)
 
 const char * gprs_get_imei(gprs_t * gprs)
 {
-	return gprs == NULL ? "" : gprs->imei;
+	return gprs->imei;
 }
 
 
 u8_t gprs_get_csq(gprs_t * gprs)
 {
-	return gprs == NULL ? GSM_CSQ_INVALID : gprs->csq;
+	return gprs->csq;
 }
 
 
@@ -1265,6 +1272,14 @@ void gprs_set_roaming(gprs_t * gprs,u8_t roaming)
 }
 
 
+#if GPRS_TYPE
+const char * gprs_get_type(gprs_t * gprs)
+{
+	return gprs->type;
+}
+#endif
+
+
 #if GPRS_SERIAL_STAT
 void gprs_get_stat(gprs_t * gprs,u32_t * sent,u32_t * rcvd)
 {
@@ -1272,4 +1287,5 @@ void gprs_get_stat(gprs_t * gprs,u32_t * sent,u32_t * rcvd)
 	*rcvd = gprs->rcvdBtes;
 }
 #endif
+
 #endif  /* GPRS_SUPPPORT */
